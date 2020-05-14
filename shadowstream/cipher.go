@@ -3,6 +3,8 @@ package shadowstream
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/md5"
+	"crypto/rc4"
 	"errors"
 	"strconv"
 
@@ -93,4 +95,28 @@ func Xchacha20(key []byte) (Cipher, error) {
 		return nil, KeySizeError(chacha.KeySize)
 	}
 	return xchacha20key(key), nil
+}
+
+type rc4md5Key []byte
+
+func (r rc4md5Key) IVSize() int                       { return 16 }
+func (r rc4md5Key) Decrypter(iv []byte) cipher.Stream { return r.Encrypter(iv) }
+func (r rc4md5Key) Encrypter(iv []byte) cipher.Stream {
+	h := md5.New()
+	h.Write(r)
+	h.Write(iv)
+	rc4key := h.Sum(nil)
+
+	ciph, err := rc4.NewCipher(rc4key)
+	if err != nil {
+		panic(err)
+	}
+	return ciph
+}
+
+func Rc4Md5(key []byte) (Cipher, error) {
+	if len(key) != 16 {
+		return nil, KeySizeError(16)
+	}
+	return rc4md5Key(key), nil
 }
